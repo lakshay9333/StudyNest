@@ -9,6 +9,9 @@ class User(AbstractUser):
     student_id = models.CharField(max_length=12, unique=True, blank=True)
     color      = models.CharField(max_length=10, default='#4a6741')
     created_at = models.DateTimeField(auto_now_add=True)
+    last_seen  = models.DateTimeField(null=True, blank=True)
+    last_typing_peer_id = models.IntegerField(null=True, blank=True)
+    last_typing_time = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         db_table = 'sn_users'
@@ -48,6 +51,17 @@ class Message(models.Model):
     text      = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
 
+    status     = models.CharField(max_length=15, default='sent')
+
+    file       = models.FileField(upload_to='chat_attachments/', null=True, blank=True)
+    file_name  = models.CharField(max_length=255, null=True, blank=True)
+    file_type  = models.CharField(max_length=50, null=True, blank=True)  # 'image', 'video', 'document', 'other'
+    file_size  = models.IntegerField(null=True, blank=True)
+
+    reply_to   = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='replies')
+    is_edited  = models.BooleanField(default=False)
+    is_deleted = models.BooleanField(default=False)
+
     class Meta:
         db_table = 'sn_messages'
         ordering = ['created_at']
@@ -57,13 +71,23 @@ class Message(models.Model):
 
     def to_dict(self, me_id):
         return {
-            'id':      self.id,
-            'from':    self.sender_id,
-            'to':      self.receiver_id,
-            'text':    self.text,
-            'ts':      int(self.created_at.timestamp() * 1000),
-            'time':    dj_tz.localtime(self.created_at).strftime('%H:%M'),
-            'is_me':   self.sender_id == me_id,
+            'id':              self.id,
+            'from':            self.sender_id,
+            'to':              self.receiver_id,
+            'text':            "[This message was deleted]" if self.is_deleted else self.text,
+            'ts':              int(self.created_at.timestamp() * 1000),
+            'time':            dj_tz.localtime(self.created_at).strftime('%H:%M'),
+            'is_me':           self.sender_id == me_id,
+            'status':          self.status,
+            'file_url':        None if self.is_deleted else (self.file.url if self.file else None),
+            'file_name':       None if self.is_deleted else self.file_name,
+            'file_type':       None if self.is_deleted else self.file_type,
+            'file_size':       None if self.is_deleted else self.file_size,
+            'reply_to':        self.reply_to_id,
+            'reply_to_text':   self.reply_to.text if (self.reply_to and self.reply_to.text) else (f"[{self.reply_to.file_type.capitalize()}]" if (self.reply_to and self.reply_to.file_type) else None),
+            'reply_to_sender': self.reply_to.sender.first_name or self.reply_to.sender.username if self.reply_to else None,
+            'is_edited':       self.is_edited,
+            'is_deleted':      self.is_deleted,
         }
 
 

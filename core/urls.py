@@ -29,4 +29,9 @@ urlpatterns = [
 
     # Messages
     path('api/messages/<int:peer_id>/', views.api_messages,        name='api_messages'),
+    path('api/messages/<int:peer_id>/typing/', views.api_typing,    name='api_typing'),
+    path('api/messages/detail/<int:msg_id>/', views.api_message_detail, name='api_message_detail'),
+
+    # AI Search (proxied — fixes CORS error from direct browser calls)
+    path('api/ai/search/',             views.api_ai_search,        name='api_ai_search'),
 ]

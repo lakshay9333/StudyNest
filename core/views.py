@@ -218,6 +218,17 @@ def _get_relation(me, other):
     return 'none'
 
 
+def _update_last_seen(user):
+    if user.is_authenticated:
+        User.objects.filter(id=user.id).update(last_seen=timezone.now())
+
+
+def _is_online(user):
+    if not user.last_seen:
+        return False
+    return (timezone.now() - user.last_seen).total_seconds() < 15
+
+
 @login_required
 @require_POST
 def api_send_request(request):
@@ -229,10 +240,20 @@ def api_send_request(request):
         return err('User not found.')
     if receiver == request.user:
         return err('Cannot add yourself.')
-    _, created = FriendRequest.objects.get_or_create(
+    # If there is already a pending request from receiver to request.user, accept it!
+    reverse_fr = FriendRequest.objects.filter(sender=receiver, receiver=request.user, status='pending').first()
+    if reverse_fr:
+        reverse_fr.status = 'accepted'
+        reverse_fr.save()
+        return ok({'created': False, 'accepted': True})
+
+    fr, created = FriendRequest.objects.get_or_create(
         sender=request.user, receiver=receiver,
         defaults={'status': 'pending'}
     )
+    if not created and fr.status != 'accepted':
+        fr.status = 'pending'
+        fr.save()
     return ok({'created': created})
 
 
@@ -256,10 +277,17 @@ def api_respond_request(request):
 
 @login_required
 def api_friends(request):
+    _update_last_seen(request.user)
     accepted = FriendRequest.objects.filter(
         Q(sender=request.user) | Q(receiver=request.user),
         status='accepted'
     ).select_related('sender', 'receiver')
+    
+    # Mark all incoming messages from these friends to me as delivered if they are 'sent'
+    for fr in accepted:
+        friend = fr.receiver if fr.sender == request.user else fr.sender
+        Message.objects.filter(sender=friend, receiver=request.user, status='sent').update(status='delivered')
+
     friends = []
     for fr in accepted:
         friend = fr.receiver if fr.sender == request.user else fr.sender
@@ -268,15 +296,25 @@ def api_friends(request):
             Q(sender=request.user, receiver=friend) |
             Q(sender=friend, receiver=request.user)
         ).order_by('-created_at').first()
+        
+        unread_count = Message.objects.filter(
+            sender=friend,
+            receiver=request.user,
+            status__in=['sent', 'delivered']
+        ).count()
+        
         friends.append({
             **_user_dict(friend),
-            'last_msg': last.text[:40] if last else '',
+            'last_msg': ("[This message was deleted]" if last.is_deleted else last.text[:40]) if last else '',
+            'unread_count': unread_count,
+            'online': _is_online(friend),
         })
     return ok({'friends': friends})
 
 
 @login_required
 def api_pending_requests(request):
+    _update_last_seen(request.user)
     incoming = FriendRequest.objects.filter(
         receiver=request.user, status='pending'
     ).select_related('sender')
@@ -298,6 +336,27 @@ def api_messages(request, peer_id):
         return err('Not friends.', 403)
 
     if request.method == 'GET':
+        _update_last_seen(request.user)
+        active = request.GET.get('active') == 'true'
+        if active:
+            Message.objects.filter(sender=peer, receiver=request.user, status__in=['sent', 'delivered']).update(status='seen')
+        else:
+            Message.objects.filter(sender=peer, receiver=request.user, status='sent').update(status='delivered')
+
+        # Check if requesting older history
+        before_id = request.GET.get('before_id')
+        if before_id:
+            try:
+                ref_msg = Message.objects.get(id=int(before_id))
+                msgs = Message.objects.filter(
+                    Q(sender=request.user, receiver=peer) |
+                    Q(sender=peer, receiver=request.user)
+                ).filter(created_at__lt=ref_msg.created_at).order_by('-created_at')[:20]
+                msgs = reversed(list(msgs))
+                return ok({'messages': [m.to_dict(request.user.id) for m in msgs]})
+            except Exception:
+                return err('Failed to fetch pagination.')
+
         # Support polling: since= (timestamp ms) — returns messages newer than that ts
         since_ts = request.GET.get('since')
         msgs = Message.objects.filter(
@@ -308,19 +367,96 @@ def api_messages(request, peer_id):
             try:
                 ts_ms = int(since_ts)
                 if ts_ms > 0:
-                    from datetime import datetime, timezone as tz
+                    from datetime import datetime, timezone as tz, timedelta
                     dt = datetime.fromtimestamp(ts_ms / 1000.0, tz=tz.utc)
-                    msgs = msgs.filter(created_at__gt=dt)
+                    recent_limit = datetime.now(tz=tz.utc) - timedelta(minutes=10)
+                    msgs = msgs.filter(
+                        Q(created_at__gt=dt) |
+                        Q(sender=request.user, status__in=['sent', 'delivered']) |
+                        Q(sender=request.user, status='seen', created_at__gt=recent_limit)
+                    )
             except Exception:
                 pass
-        return ok({'messages': [m.to_dict(request.user.id) for m in msgs]})
+        else:
+            # Initial load: get last 35 messages
+            msgs = msgs.order_by('-created_at')[:35]
+            msgs = list(msgs)
+            msgs.reverse()
+
+        peer_typing = False
+        if peer.last_typing_peer_id == request.user.id and peer.last_typing_time:
+            if (timezone.now() - peer.last_typing_time).total_seconds() < 5:
+                peer_typing = True
+
+        return ok({
+            'messages': [m.to_dict(request.user.id) for m in msgs],
+            'is_typing': peer_typing,
+            'online': _is_online(peer)
+        })
 
     if request.method == 'POST':
-        d = json_body(request)
-        text = (d.get('text') or '').strip()
-        if not text:
+        text = ''
+        file = None
+        file_name = None
+        file_type = None
+        file_size = None
+        reply_to_id = None
+        
+        if request.content_type.startswith('multipart/form-data'):
+            text = request.POST.get('text', '').strip()
+            reply_to_id = request.POST.get('reply_to')
+            file = request.FILES.get('file')
+            if file:
+                file_name = file.name
+                file_size = file.size
+                
+                # Size validation: max 10MB
+                if file_size > 10 * 1024 * 1024:
+                    return err('File size exceeds the 10MB limit.')
+                
+                # Extension validation
+                ext = file_name.split('.')[-1].lower() if '.' in file_name else ''
+                allowed_exts = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'mp4', 'mov', 'webm', 'pdf', 'docx', 'xlsx', 'pptx', 'ppt', 'txt']
+                if ext not in allowed_exts:
+                    return err(f'File type .{ext} is not supported.')
+                
+                if ext in ['png', 'jpg', 'jpeg', 'gif', 'webp']:
+                    file_type = 'image'
+                elif ext in ['mp4', 'mov', 'webm']:
+                    file_type = 'video'
+                elif ext in ['pdf', 'docx', 'xlsx', 'pptx', 'ppt', 'txt']:
+                    file_type = 'document'
+                else:
+                    file_type = 'other'
+        else:
+            d = json_body(request)
+            text = (d.get('text') or '').strip()
+            reply_to_id = d.get('reply_to')
+            
+        if not text and not file:
             return err('Message cannot be empty.')
-        msg = Message.objects.create(sender=request.user, receiver=peer, text=text)
+
+        reply_to = None
+        if reply_to_id:
+            try:
+                reply_to = Message.objects.get(
+                    Q(id=reply_to_id) &
+                    (Q(sender=request.user, receiver=peer) | Q(sender=peer, receiver=request.user))
+                )
+            except (Message.DoesNotExist, ValueError):
+                pass
+            
+        msg = Message.objects.create(
+            sender=request.user, 
+            receiver=peer, 
+            text=text, 
+            status='sent',
+            file=file,
+            file_name=file_name,
+            file_type=file_type,
+            file_size=file_size,
+            reply_to=reply_to
+        )
         return ok({'message': msg.to_dict(request.user.id)})
 
     return err('Method not allowed.', 405)
@@ -341,3 +477,132 @@ def api_stats(request):
         'tasks_total':  tasks_total,
         'tasks_done':   tasks_done,
     })
+
+
+# ─── AI SEARCH PROXY ──────────────────────────────────────────────────────────
+import urllib.request
+import urllib.error
+from django.conf import settings
+
+@login_required
+@csrf_exempt
+@require_POST
+def api_ai_search(request):
+    """
+    Proxy AI search to Anthropic API from the backend.
+    Key is read from settings.ANTHROPIC_API_KEY (set in settings.py).
+    This avoids the CORS error that happened when the browser called
+    api.anthropic.com directly, AND avoids Windows `export` not working.
+    """
+    d = json_body(request)
+    question = (d.get('question') or '').strip()
+    model_id  = (d.get('model_id') or 'gpt4').strip()
+
+    if not question:
+        return err('Question is required.')
+
+    personas = {
+        'gpt4':   'You are GPT-4o by OpenAI. Answer clearly and helpfully with practical focus.',
+        'claude': 'You are Claude by Anthropic. Answer thoughtfully with nuance and educational depth.',
+        'gemini': 'You are Gemini Pro by Google. Answer comprehensively using broad knowledge.',
+    }
+    persona = personas.get(model_id, personas['claude'])
+
+    # Read key from settings.py — works on all platforms including Windows
+    api_key = getattr(settings, 'ANTHROPIC_API_KEY', '').strip()
+
+    if not api_key or api_key == 'your_api_key_here':
+        return ok({
+            'answer':          'AI search needs your API key. Open studynest/settings.py and set ANTHROPIC_API_KEY = "your-real-key". Get a free key at https://console.anthropic.com',
+            'clarity_score':   7,
+            'depth_score':     7,
+            'accuracy_score':  7,
+            'total':           7.0,
+            'key_points':      ['Open studynest/settings.py', 'Set ANTHROPIC_API_KEY = "sk-ant-..."', 'Save the file and restart the server'],
+            'model_id':        model_id,
+            'fallback':        True,
+        })
+
+    system_prompt = (
+        f"{persona}\n\n"
+        "Respond ONLY with a valid JSON object (no markdown, no backticks, no extra text). Fields:\n"
+        "- answer: string (clear 3-5 sentence explanation)\n"
+        "- clarity_score: integer 1-10\n"
+        "- depth_score: integer 1-10\n"
+        "- accuracy_score: integer 1-10\n"
+        "- key_points: array of exactly 3 short strings"
+    )
+
+    payload = json.dumps({
+        'model':      'claude-sonnet-4-20250514',
+        'max_tokens': 1000,
+        'system':     system_prompt,
+        'messages':   [{'role': 'user', 'content': question}],
+    }).encode('utf-8')
+
+    req = urllib.request.Request(
+        'https://api.anthropic.com/v1/messages',
+        data    = payload,
+        method  = 'POST',
+        headers = {
+            'Content-Type':      'application/json',
+            'x-api-key':         api_key,
+            'anthropic-version': '2023-06-01',
+        }
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            body = json.loads(resp.read().decode('utf-8'))
+        raw_text = ''.join(c.get('text', '') for c in body.get('content', []))
+        clean    = raw_text.replace('```json', '').replace('```', '').strip()
+        parsed   = json.loads(clean)
+        total    = round(
+            (parsed.get('clarity_score', 5) +
+             parsed.get('depth_score',   5) +
+             parsed.get('accuracy_score',5)) / 3, 1
+        )
+        return ok({**parsed, 'total': total, 'model_id': model_id})
+
+    except urllib.error.HTTPError as e:
+        body = e.read().decode('utf-8', errors='replace')
+        return err(f'Anthropic API error {e.code}: {body[:200]}', 502)
+    except Exception as e:
+        return err(f'AI search failed: {str(e)[:200]}', 500)
+
+
+@login_required
+@require_POST
+def api_typing(request, peer_id):
+    _update_last_seen(request.user)
+    User.objects.filter(id=request.user.id).update(
+        last_typing_peer_id=peer_id,
+        last_typing_time=timezone.now()
+    )
+    return ok()
+
+
+@login_required
+def api_message_detail(request, msg_id):
+    _update_last_seen(request.user)
+    try:
+        msg = Message.objects.get(id=msg_id, sender=request.user)
+    except Message.DoesNotExist:
+        return err('Message not found.', 404)
+        
+    if request.method == 'PATCH':
+        d = json_body(request)
+        text = (d.get('text') or '').strip()
+        if not text:
+            return err('Message text cannot be empty.')
+        msg.text = text
+        msg.is_edited = True
+        msg.save()
+        return ok({'message': msg.to_dict(request.user.id)})
+        
+    if request.method == 'DELETE':
+        msg.is_deleted = True
+        msg.save()
+        return ok({'message': msg.to_dict(request.user.id)})
+        
+    return err('Method not allowed.', 405)

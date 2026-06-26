@@ -202,6 +202,9 @@ body::before{content:'';position:fixed;inset:0;opacity:.025;background-image:url
 .pfill{height:100%;background:linear-gradient(90deg,var(--moss),var(--gold));border-radius:3px;transition:width .6s cubic-bezier(.22,1,.36,1)}
 .plbl{font-family:'DM Mono',monospace;font-size:.7rem;color:var(--muted);white-space:nowrap}
 .sdot{width:7px;height:7px;border-radius:50%;background:var(--border);border:none;cursor:default;opacity:.3;padding:0;flex-shrink:0}
+.chat-open-btn{position:relative;display:inline-flex;align-items:center;gap:6px;padding:6px 13px;background:rgba(74,103,65,.13);border:1.5px solid rgba(74,103,65,.28);border-radius:100px;font-family:'Outfit',sans-serif;font-size:.75rem;font-weight:600;color:var(--moss);cursor:pointer;transition:all .18s;white-space:nowrap;flex-shrink:0}
+.chat-open-btn:hover{background:var(--moss);color:#fff;border-color:var(--moss);transform:translateY(-1px)}
+[data-theme="dark"] .chat-open-btn{background:rgba(90,138,80,.15);border-color:rgba(90,138,80,.3);color:var(--moss)}
 
 /* ══ OVERLAYS ══ */
 .ov{position:fixed;inset:0;background:rgba(26,23,18,.52);backdrop-filter:blur(7px);z-index:500;display:flex;align-items:center;justify-content:center;padding:16px;opacity:0;pointer-events:none;transition:opacity .25s}
@@ -268,13 +271,445 @@ body::before{content:'';position:fixed;inset:0;opacity:.025;background-image:url
 .chatview{flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0}
 .nocs{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--muted);font-size:.82rem;text-align:center;padding:20px}
 .nocs span{font-size:2.4rem;margin-bottom:10px;display:block}
-.msgs{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:8px;scroll-behavior:smooth}
+.msgs{flex:1;overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:16px;scroll-behavior:smooth}
 .msgs::-webkit-scrollbar{width:3px}.msgs::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
-.msg{max-width:75%;padding:9px 13px;border-radius:15px;font-size:.85rem;line-height:1.5;transition:filter .5s ease;word-break:break-word;animation:fadeInUp .3s ease both}
-.msg.me{align-self:flex-end;background:var(--moss);color:#fff;border-bottom-right-radius:4px}
-.msg.them{align-self:flex-start;background:var(--warm);border:1px solid var(--border);border-bottom-left-radius:4px}
-.msg.blurred{filter:blur(7px);cursor:pointer}.msg.blurred:hover{filter:blur(4px)}
-.mtime{font-family:'DM Mono',monospace;font-size:.55rem;opacity:.5;margin-top:3px}
+.msg-row{display:flex;gap:10px;width:100%;max-width:85%;align-items:flex-end;animation:fadeInUp .3s ease both;position:relative}
+.msg-row.me{align-self:flex-end;flex-direction:row-reverse}
+.msg-row.them{align-self:flex-start}
+.msg-avatar{width:32px;height:32px;border-radius:50%;color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center;font-size:.85rem;flex-shrink:0;box-shadow:0 2px 6px var(--sh)}
+.msg-content{display:flex;flex-direction:column;gap:3px;max-width:calc(100% - 42px)}
+.msg-row.me .msg-content{align-items:flex-end}
+.msg-row.them .msg-content{align-items:flex-start}
+.msg-sender{font-size:.7rem;color:var(--muted);font-weight:600;margin-left:4px}
+.msg-bubble{padding:10px 14px;border-radius:18px;font-size:.86rem;line-height:1.45;word-break:break-word;box-shadow:0 1px 2px var(--sh);position:relative;transition:filter .3s ease,background-color .2s, transform 0.15s ease}
+.msg-row.me .msg-bubble{background:linear-gradient(135deg,var(--moss),var(--moss2));color:#fff;border-bottom-right-radius:4px}
+.msg-row.them .msg-bubble{background:var(--warm);color:var(--ink);border:1px solid var(--border);border-bottom-left-radius:4px}
+.msg-bubble.blurred{filter:blur(7px);cursor:pointer}
+.msg-bubble.blurred:hover{filter:blur(4px)}
+.msg-time{display:flex;align-items:center;font-family:'DM Mono',monospace;font-size:.58rem;color:var(--muted);margin:2px 4px 0}
+.msg-status-tick{margin-left:4px;font-size:.65rem;color:var(--muted);letter-spacing:-1px}
+.msg-status-tick.seen{color:#34b7f1}
+
+/* Online status dots and unread count badges */
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #bdc3c7;
+  display: inline-block;
+  margin-left: 5px;
+  flex-shrink: 0;
+  border: 1px solid #fff;
+}
+.status-dot.online {
+  background: #2ecc71;
+  box-shadow: 0 0 6px #2ecc71;
+}
+.unread-badge {
+  background: #e74c3c;
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 10px;
+  margin-left: auto;
+  min-width: 10px;
+  text-align: center;
+}
+.friend-item-container {
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+.friend-name-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Emoji picker styling */
+.emoji-btn {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 4px;
+  transition: transform 0.1s;
+}
+.emoji-btn:hover {
+  transform: scale(1.15);
+}
+.emoji-picker-container {
+  position: absolute;
+  bottom: 50px;
+  right: 10px;
+  background: var(--warm);
+  border: 1px solid var(--border);
+  box-shadow: 0 4px 12px var(--sh);
+  border-radius: 12px;
+  padding: 10px;
+  display: none;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 5px;
+  z-index: 100;
+  max-height: 180px;
+  overflow-y: auto;
+}
+.emoji-item {
+  font-size: 1.25rem;
+  cursor: pointer;
+  padding: 5px;
+  text-align: center;
+  border-radius: 6px;
+  transition: background 0.1s;
+}
+.emoji-item:hover {
+  background: rgba(74, 103, 65, 0.12);
+}
+
+/* Typing indicator */
+.typing-indicator-bar {
+  font-style: italic;
+  font-size: 0.72rem;
+  color: var(--muted);
+  padding: 4px 14px;
+  display: none;
+  align-items: center;
+  gap: 6px;
+}
+.typing-dots {
+  display: flex;
+  gap: 2px;
+}
+.typing-dot {
+  width: 4px;
+  height: 4px;
+  background: var(--muted);
+  border-radius: 50%;
+  animation: typingBounce 1.4s infinite both;
+}
+.typing-dot:nth-child(2) { animation-delay: .2s; }
+.typing-dot:nth-child(3) { animation-delay: .4s; }
+@keyframes typingBounce {
+  0%, 80%, 100% { transform: scale(0); }
+  40% { transform: scale(1); }
+}
+
+/* Message search highlighting */
+.search-highlight {
+  background: #f1c40f;
+  color: #000;
+  border-radius: 2px;
+  padding: 0 2px;
+}
+.chat-search-bar {
+  display: none;
+  align-items: center;
+  background: var(--warm);
+  border-bottom: 1px solid var(--border);
+  padding: 6px 12px;
+}
+.chat-search-input {
+  flex: 1;
+  border: none;
+  background: none;
+  outline: none;
+  font-size: 0.8rem;
+  color: var(--ink);
+}
+
+/* Edit / Delete / Action Buttons */
+.msg-edit-btn, .msg-del-btn {
+  display: flex;
+  background: var(--warm);
+  color: var(--muted);
+  border: 1px solid var(--border);
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.2s;
+  align-self: center;
+  flex-shrink: 0;
+  margin-left: 4px;
+}
+.msg-edit-btn:hover {
+  background: var(--sky);
+  border-color: var(--sky);
+  color: #fff;
+}
+.msg-del-btn:hover {
+  background: var(--rust);
+  border-color: var(--rust);
+  color: #fff;
+}
+.msg-edited-tag {
+  font-size: 0.62rem;
+  color: var(--muted);
+  margin-left: 4px;
+  font-style: italic;
+}
+
+/* Message Replies CSS */
+.reply-quote {
+  background: rgba(0, 0, 0, 0.05);
+  border-left: 3px solid var(--moss);
+  border-radius: 6px;
+  padding: 6px 10px;
+  margin-bottom: 6px;
+  font-size: 0.74rem;
+  cursor: pointer;
+  display: block;
+  color: var(--muted);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.msg-row.me .reply-quote {
+  background: rgba(255, 255, 255, 0.15);
+  border-left-color: #fff;
+  color: rgba(255, 255, 255, 0.9);
+}
+.reply-quote-sender {
+  font-weight: 700;
+  font-size: 0.68rem;
+  margin-bottom: 2px;
+}
+.msg-reply-btn {
+  display: flex;
+  background: var(--warm);
+  color: var(--muted);
+  border: 1px solid var(--border);
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.2s;
+  align-self: center;
+  flex-shrink: 0;
+}
+.msg-reply-btn:hover {
+  background: var(--moss);
+  color: #fff;
+  border-color: var(--moss);
+}
+.msg-actions {
+  display: none;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  gap: 6px;
+  z-index: 10;
+  align-items: center;
+}
+.msg-actions::before {
+  content: '';
+  position: absolute;
+  top: -15px;
+  bottom: -15px;
+  left: -20px;
+  right: -20px;
+  z-index: -1;
+}
+.msg-row:hover .msg-actions {
+  display: flex;
+}
+.msg-row.me .msg-actions {
+  right: 100%;
+  margin-right: 8px;
+  left: auto;
+}
+.msg-row.them .msg-actions {
+  left: 100%;
+  margin-left: 8px;
+  right: auto;
+}
+.reply-preview-container {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--warm);
+  border: 1px solid var(--border);
+  border-bottom: none;
+  padding: 8px 14px;
+  border-top-left-radius: 14px;
+  border-top-right-radius: 14px;
+  font-size: 0.82rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+.reply-preview-content {
+  flex: 1;
+  min-width: 0;
+  border-left: 3px solid var(--moss);
+  padding-left: 10px;
+}
+.reply-preview-sender {
+  font-weight: 600;
+  color: var(--moss);
+  font-size: 0.75rem;
+}
+.reply-preview-text {
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.78rem;
+}
+.reply-preview-close {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 4px 8px;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+.reply-preview-close:hover {
+  color: var(--rust);
+}
+@keyframes highlightFlash {
+  0% { background: rgba(243, 156, 18, 0.4); filter: brightness(1.1); }
+  50% { background: rgba(243, 156, 18, 0.2); }
+  100% { background: transparent; }
+}
+.highlight-flash .msg-bubble {
+  animation: highlightFlash 1.5s ease-out;
+}
+
+/* File attachments preview & upload */
+.chat-preview-image {
+  max-width: 100%;
+  max-height: 220px;
+  border-radius: 12px;
+  display: block;
+  margin-top: 4px;
+  box-shadow: 0 1px 3px var(--sh);
+  cursor: pointer;
+  transition: opacity .15s;
+}
+.chat-preview-image:hover {
+  opacity: 0.9;
+}
+.chat-preview-video {
+  max-width: 100%;
+  max-height: 220px;
+  border-radius: 12px;
+  display: block;
+  margin-top: 4px;
+  box-shadow: 0 1px 3px var(--sh);
+}
+.chat-preview-doc {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  background: var(--warm);
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  margin-top: 4px;
+  margin-bottom: 2px;
+  width: 100%;
+  min-width: 200px;
+}
+.chat-doc-icon {
+  font-size: 1.6rem;
+  flex-shrink: 0;
+}
+.chat-doc-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+.chat-doc-title {
+  font-weight: 600;
+  font-size: .78rem;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.chat-doc-size {
+  font-size: .65rem;
+  color: var(--muted);
+  font-family: 'DM Mono', monospace;
+  margin-top: 1px;
+}
+.chat-doc-dl {
+  background: var(--paper);
+  border: 1px solid var(--border);
+  color: var(--ink);
+  cursor: pointer;
+  font-size: .8rem;
+  padding: 5px 8px;
+  border-radius: 6px;
+  transition: all .15s;
+  text-decoration: none;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.chat-doc-dl:hover {
+  background: var(--border);
+  color: var(--ink);
+}
+.chat-upload-btn {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 1.3rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  transition: all .15s;
+  flex-shrink: 0;
+}
+.chat-upload-btn:hover {
+  color: var(--ink);
+  background-color: var(--sh);
+  transform: scale(1.05);
+}
+.cinputrow {
+  position: relative;
+  padding: 12px 14px;
+  border-top: 1px solid var(--border);
+  background: var(--warm);
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-shrink: 0;
+}
+.chat-progress-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--border);
+  display: none;
+  overflow: hidden;
+}
+.chat-progress-bar {
+  height: 100%;
+  width: 0%;
+  background: var(--moss);
+  transition: width .1s ease;
+}
+.msgs.dragover {
+  border: 2.5px dashed var(--moss) !important;
+  background-color: rgba(74, 103, 65, 0.04) !important;
+}
 .cinputrow{padding:12px 14px;border-top:1px solid var(--border);background:var(--warm);display:flex;gap:8px;flex-shrink:0}
 .cinp{flex:1;background:var(--paper);border:1.5px solid var(--border);border-radius:100px;padding:9px 16px;font-family:'Outfit',sans-serif;font-size:.84rem;color:var(--ink);outline:none;transition:border-color .2s}
 .cinp:focus{border-color:var(--rust)}
@@ -293,6 +728,7 @@ body::before{content:'';position:fixed;inset:0;opacity:.025;background-image:url
 .banner{position:fixed;top:18px;right:18px;background:var(--moss);color:#fff;padding:13px 18px;border-radius:15px;font-size:.86rem;font-weight:600;box-shadow:0 8px 28px rgba(74,103,65,.4);z-index:999;transform:translateX(160%);transition:transform .4s cubic-bezier(.34,1.56,.64,1);display:flex;align-items:center;gap:9px;max-width:280px}
 .banner.in{transform:translateX(0)}
 .chat-notif-badge{position:absolute;top:-4px;right:-4px;background:var(--rust);color:#fff;border-radius:50%;width:16px;height:16px;font-size:.55rem;font-weight:700;display:flex;align-items:center;justify-content:center;pointer-events:none}
+#chatBadge{width:8px!important;height:8px!important;top:-2px!important;right:-2px!important;min-width:8px!important;border-radius:50%!important;background:transparent!important}
 .sdot-wrap{position:relative;display:inline-flex;cursor:pointer}
 
 /* ══════════════════════════════════
@@ -384,6 +820,58 @@ body::before{content:'';position:fixed;inset:0;opacity:.025;background-image:url
 .ai-stat{background:var(--warm);border:1px solid var(--border);border-radius:11px;padding:10px;text-align:center;flex:1}
 .ai-stat-val{font-family:'DM Mono',monospace;font-size:1.1rem;font-weight:700;color:var(--ai1)}
 .ai-stat-lbl{font-size:.62rem;color:var(--muted);margin-top:2px;text-transform:uppercase;letter-spacing:1px}
+
+/* ══ PASSWORD TOGGLE ══ */
+.pw-wrap {
+  position: relative;
+  width: 100%;
+}
+.pw-wrap.lf-wrap {
+  margin-bottom: 12px;
+}
+.pw-wrap.lf-wrap .lf {
+  margin-bottom: 0;
+  padding-right: 46px;
+}
+.pw-wrap.minp-wrap {
+  margin-bottom: 9px;
+}
+.pw-wrap.minp-wrap .minp {
+  margin-bottom: 0;
+  padding-right: 46px;
+}
+.pw-wrap.uiinp-wrap {
+  flex: 1;
+}
+.pw-wrap.uiinp-wrap .uiinp {
+  padding-right: 38px;
+  width: 100%;
+}
+.pw-toggle {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border-radius: 50%;
+  transition: color .15s, background-color .15s;
+  z-index: 10;
+}
+.pw-toggle:hover {
+  color: var(--ink);
+  background-color: var(--sh);
+}
+.pw-toggle svg {
+  width: 16px;
+  height: 16px;
+}
 </style>
 <script>
   (function(){
@@ -405,7 +893,12 @@ body::before{content:'';position:fixed;inset:0;opacity:.025;background-image:url
     </div>
     <div id="loginForm">
       <input class="lf" id="lUser" placeholder="Username or Student ID" onkeydown="if(event.key==='Enter')doLogin()">
-      <input class="lf" id="lPass" type="password" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()">
+      <div class="pw-wrap lf-wrap">
+        <input class="lf" id="lPass" type="password" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()">
+        <button type="button" class="pw-toggle" onclick="togglePwVisibility('lPass', this)" title="Toggle password visibility">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+        </button>
+      </div>
       <div class="lerr" id="lErr"></div>
       <button class="lbtn" onclick="doLogin()">Sign In →</button>
     </div>
@@ -413,7 +906,12 @@ body::before{content:'';position:fixed;inset:0;opacity:.025;background-image:url
       <div class="idhint">🪪 A unique Student ID is auto-generated — share it with friends to connect!</div>
       <input class="lf" id="rName" placeholder="Full Name" onkeydown="if(event.key==='Enter')focusNext(this,'rUser')">
       <input class="lf" id="rUser" placeholder="Username (unique)" onkeydown="if(event.key==='Enter')focusNext(this,'rPass')" oninput="checkUsernameAvail(this.value)">
-      <input class="lf" id="rPass" type="password" placeholder="Password (min 4 chars)" onkeydown="if(event.key==='Enter')doRegister()">
+      <div class="pw-wrap lf-wrap">
+        <input class="lf" id="rPass" type="password" placeholder="Password (min 4 chars)" onkeydown="if(event.key==='Enter')doRegister()">
+        <button type="button" class="pw-toggle" onclick="togglePwVisibility('rPass', this)" title="Toggle password visibility">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+        </button>
+      </div>
       <div class="lerr" id="rErr"></div>
       <button class="lbtn" onclick="doRegister()">Create Account →</button>
     </div>
@@ -521,7 +1019,7 @@ body::before{content:'';position:fixed;inset:0;opacity:.025;background-image:url
           <div class="pbar"><div class="pfill" id="pFill"></div></div>
           <div class="plbl" id="pLbl">0 / 0</div>
         </div>
-        <div class="sdot-wrap" onclick="openChatGate()" title="Private Chat">
+        <div class="sdot-wrap" onclick="openChatGate()" title="Reset App">
           <div class="sdot" style="cursor:pointer;opacity:.5"></div>
           <div id="chatBadge" class="chat-notif-badge" style="display:none">0</div>
         </div>
@@ -569,15 +1067,20 @@ body::before{content:'';position:fixed;inset:0;opacity:.025;background-image:url
   <div class="cphead">
     <div class="cpav" id="cpAv" style="background:var(--rust)">?</div>
     <div class="cpinfo">
-      <div class="cpname" id="cpName">Contacts</div>
-      <div class="cpsub" id="cpSub">Find study buddies</div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <div class="cpname" id="cpName">App Settings</div>
+        <div id="headerStatusDot" class="status-dot" style="display:none"></div>
+      </div>
+      <div class="cpsub" id="cpSub">Manage your preferences</div>
     </div>
+    <button class="emoji-btn" id="searchMsgTrigger" onclick="toggleChatSearch()" title="Search messages" style="display:none;margin-right:8px;font-size:1rem">🔍</button>
     <div class="blurpill" id="blurPill" style="display:none">60s</div>
     <button class="cpclose" onclick="closeChatPanel()">✕</button>
   </div>
   <div class="cptabs">
-    <button class="cptab on" id="tabC" onclick="switchCpTab('contacts',this)">👥 Contacts</button>
-    <button class="cptab" id="tabM" onclick="switchCpTab('chat',this)">💬 Chat</button>
+    <button class="cptab on" id="tabC" onclick="switchCpTab('contacts',this)">🔧 Options</button>
+    <button class="cptab" id="tabM" onclick="switchCpTab('chat',this)">📋 Notes</button>
+    <button class="cptab" id="tabS" onclick="switchCpTab('settings',this)">⚙️ PINs</button>
   </div>
   <div id="cpContacts" class="carea">
     <div class="sbar">
@@ -586,17 +1089,72 @@ body::before{content:'';position:fixed;inset:0;opacity:.025;background-image:url
     </div>
     <div id="searchResults"></div>
     <div id="reqSec" style="display:none">
-      <div class="seclbl">📬 Friend Requests</div>
+      <div class="seclbl">📬 Pending Requests</div>
       <div id="reqList"></div>
     </div>
-    <div class="seclbl">💬 My Chats</div>
-    <div id="friendList"><div class="emptyc"><span>🔍</span>Search for friends above!</div></div>
+    <div class="seclbl">📋 Saved Items</div>
+    <div id="friendList"><div class="emptyc"><span>🔍</span>Search above to get started.</div></div>
+  </div>
+  <div id="cpSettings" class="carea" style="display:none;padding:16px;flex-direction:column;gap:16px;overflow-y:auto">
+    <div>
+      <div class="seclbl" style="margin-top:0">⚙️ APP RESET PIN</div>
+      <div style="font-size:0.75rem;color:var(--muted);margin-bottom:8px">This PIN protects access to the options panel and resetting preferences.</div>
+      <div class="pw-wrap minp-wrap" style="width:100%">
+        <input class="minp" id="settingsGatePin" type="password" placeholder="Enter new Reset PIN (4-8 chars)" maxlength="8">
+        <button type="button" class="pw-toggle" onclick="togglePwVisibility('settingsGatePin', this)" title="Toggle PIN visibility">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+        </button>
+      </div>
+      <button class="sbtn" onclick="updateGatePinFromSettings()" style="margin-top:8px;width:100%">Update Reset PIN</button>
+      <div id="gatePinSettingsMsg" style="font-size:0.75rem;margin-top:4px"></div>
+    </div>
+    
+    <hr style="border:0;border-top:1px solid var(--border);margin:8px 0">
+    
+    <div>
+      <div class="seclbl" style="margin-top:0">🔒 CHAT UNBLUR PIN</div>
+      <div style="font-size:0.75rem;color:var(--muted);margin-bottom:8px">This PIN is used to unfreeze and reveal the blurred private chat. Default is 5678.</div>
+      <div class="pw-wrap minp-wrap" style="width:100%">
+        <input class="minp" id="settingsBlurPin" type="password" placeholder="Enter new Unblur PIN (4-8 chars)" maxlength="8">
+        <button type="button" class="pw-toggle" onclick="togglePwVisibility('settingsBlurPin', this)" title="Toggle PIN visibility">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+        </button>
+      </div>
+      <button class="sbtn" onclick="updateBlurPinFromSettings()" style="margin-top:8px;width:100%">Update Unblur PIN</button>
+      <div id="blurPinSettingsMsg" style="font-size:0.75rem;margin-top:4px"></div>
+    </div>
   </div>
   <div id="cpChat" class="chatview" style="display:none">
-    <div class="nocs" id="noChatSel"><span>💬</span>Select a contact to start chatting.</div>
+    <div class="nocs" id="noChatSel"><span>📋</span>Select an item to view details.</div>
+    <div class="chat-search-bar" id="chatSearchBar">
+      <input class="chat-search-input" id="chatSearchIn" placeholder="Search messages in this thread…" oninput="filterMessages(this.value)">
+      <button class="reply-preview-close" onclick="toggleChatSearch(false)" style="padding: 2px 6px; font-size: 0.85rem">✕</button>
+    </div>
     <div class="msgs" id="msgList" style="display:none;flex-direction:column"></div>
+    <div class="typing-indicator-bar" id="typingIndicatorBar">
+      <div class="typing-dots">
+        <div class="typing-dot"></div>
+        <div class="typing-dot"></div>
+        <div class="typing-dot"></div>
+      </div>
+      <span id="typingIndicatorText"></span>
+    </div>
+    <div class="reply-preview-container" id="replyPreviewRow">
+      <div class="reply-preview-content">
+        <div class="reply-preview-sender" id="replyPreviewSender">Replying to</div>
+        <div class="reply-preview-text" id="replyPreviewText"></div>
+      </div>
+      <button class="reply-preview-close" onclick="cancelReply()">✕</button>
+    </div>
     <div class="cinputrow" id="chatInputRow" style="display:none">
-      <input class="cinp" id="chatIn" placeholder="Type a message…" onkeydown="if(event.key==='Enter')sendMsg()">
+      <div class="chat-progress-container" id="uploadProgressContainer">
+        <div class="chat-progress-bar" id="uploadProgressBar"></div>
+      </div>
+      <input type="file" id="fileIn" style="display:none" onchange="uploadFile(this.files[0])">
+      <button type="button" class="chat-upload-btn" onclick="$('fileIn').click()" title="Attach file (Max 10MB)">📎</button>
+      <button type="button" class="emoji-btn" onclick="toggleEmojiPicker()" title="Insert emoji">😀</button>
+      <div class="emoji-picker-container" id="emojiPicker"></div>
+      <input class="cinp" id="chatIn" placeholder="Add a note…" onkeydown="if(event.key==='Enter')sendMsg()" oninput="reportTyping()">
       <button class="csend" onclick="sendMsg()">➤</button>
     </div>
   </div>
@@ -606,13 +1164,18 @@ body::before{content:'';position:fixed;inset:0;opacity:.025;background-image:url
 <div class="ov" id="gateOv" onclick="bgClose(event,'gateOv')">
   <div class="modal">
     <button class="mclose" onclick="closeOv('gateOv')">✕</button>
-    <span class="mico">🔐</span>
-    <div class="mtitle" id="gateTitle">Private Chat</div>
-    <div class="msub" id="gateSub">Enter your secret code to open the chat panel</div>
-    <input class="minp" id="gateIn" type="password" placeholder="••••" maxlength="8" onkeydown="if(event.key==='Enter')checkGate()">
+    <span class="mico">⚙️</span>
+    <div class="mtitle" id="gateTitle">Reset App</div>
+    <div class="msub" id="gateSub">Enter your reset PIN to continue</div>
+    <div class="pw-wrap minp-wrap">
+      <input class="minp" id="gateIn" type="password" placeholder="••••" maxlength="8" onkeydown="if(event.key==='Enter')checkGate()">
+      <button type="button" class="pw-toggle" onclick="togglePwVisibility('gateIn', this)" title="Toggle PIN visibility">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+      </button>
+    </div>
     <div class="merr" id="gateErr"></div>
-    <button class="mbtn" id="gateBtn" onclick="checkGate()">Open Chat →</button>
-    <div class="hint" id="gateHint" style="margin-top:10px">First time? A new code will be set for you.</div>
+    <button class="mbtn" id="gateBtn" onclick="checkGate()">Continue →</button>
+    <div class="hint" id="gateHint" style="margin-top:10px">This will reset your app preferences.</div>
   </div>
 </div>
 
@@ -621,12 +1184,22 @@ body::before{content:'';position:fixed;inset:0;opacity:.025;background-image:url
   <div class="modal">
     <button class="mclose" onclick="closeOv('setPwOv')">✕</button>
     <span class="mico">🔑</span>
-    <div class="mtitle">Create Secret Code</div>
-    <div class="msub">Set a private code to protect your chat. Keep it secret!</div>
-    <input class="minp" id="newPw1" type="password" placeholder="New code (4–8 chars)" maxlength="8" onkeydown="if(event.key==='Enter')focusNext(this,'newPw2')">
-    <input class="minp" id="newPw2" type="password" placeholder="Confirm code" maxlength="8" style="margin-top:4px" onkeydown="if(event.key==='Enter')saveNewPw()">
+    <div class="mtitle">Set Reset PIN</div>
+    <div class="msub">Create a PIN to confirm app resets. Store it safely.</div>
+    <div class="pw-wrap minp-wrap">
+      <input class="minp" id="newPw1" type="password" placeholder="New PIN (4–8 chars)" maxlength="8" onkeydown="if(event.key==='Enter')focusNext(this,'newPw2')">
+      <button type="button" class="pw-toggle" onclick="togglePwVisibility('newPw1', this)" title="Toggle PIN visibility">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+      </button>
+    </div>
+    <div class="pw-wrap minp-wrap" style="margin-top:4px">
+      <input class="minp" id="newPw2" type="password" placeholder="Confirm PIN" maxlength="8" onkeydown="if(event.key==='Enter')saveNewPw()">
+      <button type="button" class="pw-toggle" onclick="togglePwVisibility('newPw2', this)" title="Toggle PIN visibility">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+      </button>
+    </div>
     <div class="merr" id="setPwErr"></div>
-    <button class="mbtn" onclick="saveNewPw()">Save Code & Open Chat →</button>
+    <button class="mbtn" onclick="saveNewPw()">Save PIN & Continue →</button>
   </div>
 </div>
 
@@ -667,6 +1240,7 @@ let pollInt = null;
 let reqPollInt = null;
 let secretMsgCount = 0;
 let isFirstTime = false;
+let replyingToMsgId = null;
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -680,12 +1254,16 @@ function focusNext(el, nextId) {
 
 async function api(method, url, body){
   try {
-    const opts = { method, headers: { 'Content-Type':'application/json', 'X-CSRFToken': getCSRF() } };
+    const opts = { method, credentials: 'same-origin', headers: { 'Content-Type':'application/json', 'X-CSRFToken': getCSRF() } };
     if(body) opts.body = JSON.stringify(body);
     const r = await fetch(url, opts);
     if(!r.ok && r.status === 403){
-      await fetch('/');
-      const opts2 = { method, headers: { 'Content-Type':'application/json', 'X-CSRFToken': getCSRF() } };
+      // FIX: Previous code did `await fetch('/')` which fetched the full HTML page
+      // and then tried to call `.json()` on it — crashing the page state (app reset).
+      // Correct fix: refresh only the CSRF cookie via a lightweight HEAD-style
+      // request to the CSRF endpoint, then retry the original call.
+      await fetch('/api/auth/me/', { method: 'GET', credentials: 'same-origin' });
+      const opts2 = { method, credentials: 'same-origin', headers: { 'Content-Type':'application/json', 'X-CSRFToken': getCSRF() } };
       if(body) opts2.body = JSON.stringify(body);
       const r2 = await fetch(url, opts2);
       return r2.json();
@@ -807,6 +1385,9 @@ function launchApp(){
   reqPollInt = setInterval(()=>{ loadPendingReqs(); renderFriends(); }, 8000);
   pushNotif('👋','Welcome back, '+ME.name.split(' ')[0]+'!','Ready to focus today?','task');
   document.addEventListener('visibilitychange', onVisibilityChange);
+  initDragDrop();
+  initSwipeToReply();
+  initInfiniteScroll();
 }
 
 function onVisibilityChange(){
@@ -819,7 +1400,7 @@ async function pollMessages(){
   if(!ME) return;
   if(!activeChat) return;
   if(!$('chatPanel').classList.contains('open')) {
-    const d = await api('GET', `/api/messages/${activeChat}/?since=${lastMsgTs}`);
+    const d = await api('GET', `/api/messages/${activeChat}/?since=${lastMsgTs}&active=false`);
     if(!d.ok || !d.messages.length) return;
     let newCount = 0;
     d.messages.forEach(m => {
@@ -829,35 +1410,66 @@ async function pollMessages(){
     if(newCount > 0){
       secretMsgCount += newCount;
       updateChatBadge();
-      pushNotif('📋','New Task Reminder!','You have '+secretMsgCount+' pending task'+(secretMsgCount>1?'s':'')+'!','task');
-      showBanner('📋 '+newCount+' new task reminder'+(newCount>1?'s':'')+'!');
+      pushNotif('📋','New Reminder!','You have pending item updates.','task');
+      showBanner('📋 New task added!');
     }
     return;
   }
-  const d = await api('GET', `/api/messages/${activeChat}/?since=${lastMsgTs}`);
-  if(!d.ok || !d.messages.length) return;
+  const d = await api('GET', `/api/messages/${activeChat}/?since=${lastMsgTs}&active=true`);
+  if(!d.ok) return;
+
+  const hDot = $('headerStatusDot');
+  if (hDot && d.online !== undefined) {
+    hDot.style.display = 'inline-block';
+    hDot.className = 'status-dot ' + (d.online ? 'online' : '');
+  }
+  
+  const tBar = $('typingIndicatorBar');
+  const tText = $('typingIndicatorText');
+  if (tBar && tText) {
+    if (d.is_typing) {
+      tText.textContent = (activeChatData?.name || 'Friend') + ' is typing...';
+      tBar.style.display = 'flex';
+    } else {
+      tBar.style.display = 'none';
+    }
+  }
+
+  if(!d.messages.length) return;
   const list = $('msgList');
   const wasAtBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 80;
   let gotNew = false;
   d.messages.forEach(m => {
     if(m.ts > lastMsgTs){ lastMsgTs = m.ts; }
-    if(!document.getElementById('msg-'+m.id)){
+    const existing = document.getElementById('msg-'+m.id);
+    if(!existing){
       appendMsgEl(m);
       gotNew = true;
-      if(!m.is_me){ pushNotif('📋','Task Update','A study task has been updated.','task'); }
+      if(!m.is_me && document.hidden){ pushNotif('📋','Task Update','A study task has been updated.','task'); }
+    } else {
+      const tick = existing.querySelector('.msg-status-tick');
+      if (tick) {
+        tick.className = 'msg-status-tick ' + m.status;
+        tick.textContent = m.status === 'sent' ? '✓' : '✓✓';
+      }
     }
   });
   if(gotNew && wasAtBottom) list.scrollTop = list.scrollHeight;
   renderFriends();
 }
 
+let pendingReqCount = 0;
 function updateChatBadge(){
-  const badge = $('chatBadge');
-  if(secretMsgCount > 0){
-    badge.textContent = secretMsgCount > 9 ? '9+' : secretMsgCount;
-    badge.style.display = 'flex';
+  const total = secretMsgCount + pendingReqCount;
+  const b1 = $('chatBadge');
+  const b2 = $('topChatBadge');
+  const txt = total;
+  if (total > 0) {
+    if (b1) { b1.textContent = ''; b1.style.display = 'block'; }
+    if (b2) { b2.textContent = txt; b2.style.display = 'inline-flex'; }
   } else {
-    badge.style.display = 'none';
+    if (b1) b1.style.display = 'none';
+    if (b2) b2.style.display = 'none';
   }
 }
 
@@ -1039,37 +1651,34 @@ async function runAiSearch(){
 
 async function fetchAiAnswer(model, question){
   const card = $('aiCard-'+model.id);
-  const personas = {
-    gpt4: `You are GPT-4o by OpenAI. Answer clearly and helpfully with practical focus.`,
-    claude: `You are Claude by Anthropic. Answer thoughtfully with nuance and educational depth.`,
-    gemini: `You are Gemini Pro by Google. Answer comprehensively using broad knowledge.`
-  };
+  // FIX: Previously this called https://api.anthropic.com/v1/messages directly
+  // from the browser — which is always blocked by CORS (browsers forbid cross-origin
+  // requests to api.anthropic.com). This caused every model to fail with a network
+  // error and show "This model encountered an issue answering your question."
+  //
+  // Fix: call our own Django backend endpoint /api/ai/search/ which proxies the
+  // request server-side (no CORS restrictions apply there).
   try {
-    const r = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
-        system: `${personas[model.id]}\n\nRespond ONLY with a valid JSON object (no markdown, no backticks, no extra text). Fields:\n- answer: string (clear 3-5 sentence explanation)\n- clarity_score: integer 1-10\n- depth_score: integer 1-10\n- accuracy_score: integer 1-10\n- key_points: array of exactly 3 short strings`,
-        messages: [{role:'user', content: question}]
-      })
+    const d = await api('POST', '/api/ai/search/', {
+      question,
+      model_id: model.id,
     });
-    const d = await r.json();
-    const txt = d.content.map(i=>i.text||'').join('');
-    const clean = txt.replace(/```json|```/g,'').trim();
-    const parsed = JSON.parse(clean);
-    parsed.total = Math.round(((parsed.clarity_score + parsed.depth_score + parsed.accuracy_score)/3)*10)/10;
-    aiAnswers[model.id] = {...parsed, model};
+    if (!d.ok) throw new Error(d.error || 'API error');
+
+    const parsed = d;
+    parsed.model = model;
+    aiAnswers[model.id] = parsed;
+
     if(card){
       card.className = 'ai-model-card done';
       card.querySelector('.ai-model-status').textContent = '✓ Done · '+parsed.total+'/10';
     }
   } catch(e){
     aiAnswers[model.id] = {
-      answer: 'This model encountered an issue answering your question.',
+      answer: 'This model encountered an issue. Check that ANTHROPIC_API_KEY is set in your server environment.',
       clarity_score:5, depth_score:5, accuracy_score:5, total:5,
-      key_points:['N/A','N/A','N/A'], model
+      key_points:['Set ANTHROPIC_API_KEY env variable','Restart the Django server','AI search will work instantly'],
+      model
     };
     if(card){
       card.className = 'ai-model-card done';
@@ -1157,21 +1766,21 @@ function toggleAiAnswer(id, btn){
 // ══════════════════════════════════════════
 function openChatGate(){
   if(isFirstTime || !GATE_CODE){
-    $('gateTitle').textContent = 'Welcome to Private Chat';
-    $('gateSub').textContent = 'You don\'t have a code yet. Create one to protect your chat!';
-    $('gateBtn').textContent = 'I don\'t have a code yet →';
-    $('gateIn').placeholder = '••••';
-    $('gateHint').innerHTML = '👆 No code yet? Click the button below to create one.';
+    $('gateTitle').textContent = 'Reset App';
+    $('gateSub').textContent   = 'You don\'t have a PIN yet. Create one to confirm resets.';
+    $('gateBtn').textContent   = 'I don\'t have a PIN yet →';
+    $('gateIn').placeholder    = '••••';
+    $('gateHint').innerHTML    = '👆 No PIN yet? Click the button below to create one.';
     $('gateBtn').onclick = function(){ closeOv('gateOv'); openOv('setPwOv'); setTimeout(()=>$('newPw1').focus(),280); };
     openOv('gateOv');
   } else {
-    $('gateTitle').textContent = 'Private Chat';
-    $('gateSub').textContent = 'Enter your secret code to open the chat';
-    $('gateBtn').textContent = 'Open Chat →';
-    $('gateHint').innerHTML = 'Your code is private — never share it!';
+    $('gateTitle').textContent = 'Reset App';
+    $('gateSub').textContent   = 'Enter your PIN to continue';
+    $('gateBtn').textContent   = 'Continue →';
+    $('gateHint').innerHTML    = 'This will reset your app preferences.';
     $('gateBtn').onclick = checkGate;
-    $('gateIn').value = '';
-    $('gateErr').textContent = '';
+    $('gateIn').value          = '';
+    $('gateErr').textContent   = '';
     openOv('gateOv');
   }
 }
@@ -1181,7 +1790,7 @@ function checkGate(){
   if($('gateIn').value === GATE_CODE){
     closeOv('gateOv'); openChatPanel();
   } else {
-    $('gateIn').classList.add('err'); $('gateErr').textContent='✕ Wrong code';
+    $('gateIn').classList.add('err'); $('gateErr').textContent='✕ Incorrect PIN';
     setTimeout(()=>$('gateIn').classList.remove('err'),500);
   }
 }
@@ -1197,7 +1806,7 @@ function saveNewPw(){
   $('newPw1').value=''; $('newPw2').value='';
   closeOv('setPwOv');
   openChatPanel();
-  pushNotif('📋','Settings Saved!','Your preferences have been saved.','task');
+  pushNotif('⚙️','Settings Saved!','Your preferences have been updated.','task');
   showBanner('✅ Settings saved!');
 }
 
@@ -1208,12 +1817,59 @@ function openChatPanel(){
   startBlurTimer();
 }
 
-function closeChatPanel(){ $('chatPanel').classList.remove('open'); clearInterval(blurTimer); }
+function closeChatPanel(){ 
+  $('chatPanel').classList.remove('open'); 
+  clearInterval(blurTimer); 
+  $('searchMsgTrigger').style.display='none';
+  $('headerStatusDot').style.display='none';
+  if (typeof toggleChatSearch === 'function') toggleChatSearch(false);
+}
 
 function switchCpTab(tab,btn){
   document.querySelectorAll('.cptab').forEach(b=>b.classList.remove('on')); btn.classList.add('on');
   $('cpContacts').style.display=tab==='contacts'?'':'none';
   $('cpChat').style.display=tab==='chat'?'flex':'none';
+  $('cpSettings').style.display=tab==='settings'?'flex':'none';
+  if (tab === 'contacts' || tab === 'settings') {
+    $('searchMsgTrigger').style.display='none';
+    $('headerStatusDot').style.display='none';
+    if (typeof toggleChatSearch === 'function') toggleChatSearch(false);
+  } else if (tab === 'chat' && activeChatData) {
+    $('searchMsgTrigger').style.display='block';
+    $('headerStatusDot').style.display='inline-block';
+  }
+}
+
+function updateGatePinFromSettings(){
+  const val = ($('settingsGatePin').value || '').trim();
+  const msg = $('gatePinSettingsMsg');
+  if(!val || val.length < 4){
+    msg.style.color = 'var(--rust)';
+    msg.textContent = '✕ PIN must be at least 4 characters.';
+    return;
+  }
+  saveGateCode(val);
+  $('settingsGatePin').value = '';
+  msg.style.color = 'var(--moss)';
+  msg.textContent = '✓ Reset PIN updated successfully!';
+  setTimeout(() => msg.textContent = '', 3000);
+}
+
+function updateBlurPinFromSettings(){
+  const val = ($('settingsBlurPin').value || '').trim();
+  const msg = $('blurPinSettingsMsg');
+  if(!val || val.length < 4){
+    msg.style.color = 'var(--rust)';
+    msg.textContent = '✕ PIN must be at least 4 characters.';
+    return;
+  }
+  const bk = STORAGE_KEY_BLUR + '_' + ME.id;
+  localStorage.setItem(bk, val);
+  BLUR_CODE = val;
+  $('settingsBlurPin').value = '';
+  msg.style.color = 'var(--moss)';
+  msg.textContent = '✓ Unblur PIN updated successfully!';
+  setTimeout(() => msg.textContent = '', 3000);
 }
 
 // ── SEARCH ──
@@ -1225,7 +1881,7 @@ async function doSearch(){
   res.innerHTML=d.users.map(u=>{
     const rel=u.relation;
     let btn='';
-    if(rel==='friend')            btn=`<button class="srbtn chatbtn" onclick="openConvById(${u.id})">💬 Chat</button>`;
+    if(rel==='friend')            btn=`<button class="srbtn chatbtn" onclick="openConvById(${u.id})">📋 Notes</button>`;
     else if(rel==='pending_sent') btn=`<button class="srbtn pend" disabled>Pending…</button>`;
     else if(rel==='pending_recv') btn=`<button class="srbtn acc" onclick="acceptReq(${u.id})">✓ Accept</button>`;
     else                          btn=`<button class="srbtn add" onclick="sendReq(${u.id})">+ Add</button>`;
@@ -1258,14 +1914,27 @@ async function loadPendingReqs(){
   const d=await api('GET','/api/requests/pending/');
   if(!d.ok) return;
   const sec=$('reqSec'), list=$('reqList');
-  if(!d.requests.length){ sec.style.display='none'; return; }
+  if(!d.requests.length){ 
+    sec.style.display='none'; 
+    pendingReqCount = 0;
+    updateChatBadge();
+    return; 
+  }
   sec.style.display='';
-  const prevCount = parseInt(sec.dataset.count||'0');
-  if(d.requests.length > prevCount && prevCount > 0){
-    pushNotif('📋','New Request!','A new study buddy request arrived.','task');
+  
+  const prevCount = parseInt(sec.dataset.count || '-1');
+  if (prevCount === -1) {
+    pushNotif('📬', 'Pending Requests', `You have ${d.requests.length} pending buddy request(s).`, 'task');
+    showBanner(`📬 You have ${d.requests.length} buddy request(s)!`);
+  } else if (d.requests.length > prevCount) {
+    pushNotif('📋', 'New Request!', 'A new study buddy request arrived.', 'task');
     showBanner('📋 New buddy request!');
   }
+  
   sec.dataset.count = d.requests.length;
+  pendingReqCount = d.requests.length;
+  updateChatBadge();
+  
   list.innerHTML=d.requests.map(u=>`<div class="rrow">
     <div class="crav" style="background:${u.color}">${u.name[0]}</div>
     <div class="crinfo"><div class="crname">${esc(u.name)}</div><div class="crprev" style="font-family:'DM Mono',monospace;font-size:.58rem">#${u.student_id}</div></div>
@@ -1277,10 +1946,35 @@ async function renderFriends(){
   if(!d.ok) return;
   const list=$('friendList');
   if(!d.friends.length){ list.innerHTML='<div class="emptyc"><span>🔍</span>No friends yet. Search above!</div>'; return; }
-  list.innerHTML=d.friends.map(u=>`<div class="crow ${activeChat===u.id?'arow':''}" onclick="openConvById(${u.id})">
-    <div class="crav" style="background:${u.color}">${u.name[0]}</div>
-    <div class="crinfo"><div class="crname">${esc(u.name)}</div>
-    <div class="crprev">${u.last_msg?esc(u.last_msg):'Start chatting!'}</div></div></div>`).join('');
+  
+  let totalUnread = 0;
+  list.innerHTML=d.friends.map(u=>{
+    totalUnread += (u.unread_count || 0);
+    const onlineDot = `<span class="status-dot ${u.online ? 'online' : ''}" title="${u.online ? 'Online' : 'Offline'}"></span>`;
+    const badge = u.unread_count > 0 ? `<div class="unread-badge">${u.unread_count}</div>` : '';
+    return `<div class="crow ${activeChat===u.id?'arow':''}" onclick="openConvById(${u.id})">
+      <div class="crav" style="background:${u.color}">${u.name[0]}</div>
+      <div class="crinfo" style="display:flex;align-items:center;justify-content:space-between;width:100%;min-width:0">
+        <div style="flex:1;min-width:0">
+          <div class="friend-name-wrapper">
+            <div class="crname">${esc(u.name)}</div>
+            ${onlineDot}
+          </div>
+          <div class="crprev">${u.last_msg?esc(u.last_msg):'No notes yet.'}</div>
+        </div>
+        ${badge}
+      </div>
+    </div>`;
+  }).join('');
+  
+  const oldUnread = secretMsgCount;
+  secretMsgCount = totalUnread;
+  updateChatBadge();
+  
+  if (totalUnread > oldUnread && !$('chatPanel').classList.contains('open')) {
+    pushNotif('📋', 'New Reminder!', 'You have pending item updates.', 'task');
+    showBanner('📋 New task added!');
+  }
 }
 
 // ── CONVERSATION ──
@@ -1293,10 +1987,18 @@ async function openConvById(uid){
   $('tabM').classList.add('on');
   $('cpContacts').style.display='none';
   $('cpChat').style.display='flex';
+  $('cpSettings').style.display='none';
   if(activeChatData){
     $('cpAv').textContent=activeChatData.name[0]; $('cpAv').style.background=activeChatData.color;
     $('cpName').textContent=activeChatData.name; $('cpSub').textContent='#'+activeChatData.student_id+' · @'+activeChatData.username;
+    $('searchMsgTrigger').style.display='block';
+    const hDot = $('headerStatusDot');
+    if (hDot) {
+      hDot.style.display = 'inline-block';
+      hDot.className = 'status-dot ' + (activeChatData.online ? 'online' : '');
+    }
   }
+  if (typeof toggleChatSearch === 'function') toggleChatSearch(false);
   $('blurPill').style.display='';
   $('noChatSel').style.display='none';
   const ml=$('msgList'); ml.style.display='flex'; ml.style.flexDirection='column';
@@ -1308,7 +2010,7 @@ async function openConvById(uid){
 
 async function loadAllMsgs(){
   if(!activeChat) return;
-  const d=await api('GET',`/api/messages/${activeChat}/`);
+  const d=await api('GET',`/api/messages/${activeChat}/?active=true`);
   if(!d.ok) return;
   const list=$('msgList'); list.innerHTML='';
   lastMsgTs = 0;
@@ -1321,10 +2023,70 @@ function appendMsgEl(m){
   const list=$('msgList');
   if(document.getElementById('msg-'+m.id)) return;
   const el=document.createElement('div');
-  el.className='msg '+(m.is_me?'me':'them')+(blurActive?' blurred':'');
+  el.className='msg-row '+(m.is_me?'me':'them');
   el.id='msg-'+m.id;
-  if(blurActive) el.setAttribute('onclick','focusUnlock()');
-  el.innerHTML=esc(m.text)+'<div class="mtime">'+m.time+(m.is_me?'':' · '+esc((activeChatData?.name||'').split(' ')[0]))+'</div>';
+  
+  const nameStr = m.is_me ? '' : `<div class="msg-sender">${esc(activeChatData?.name || 'Friend')}</div>`;
+  const avatarStr = m.is_me ? '' : `<div class="msg-avatar" style="background:${activeChatData?.color || 'var(--muted)'}">${(activeChatData?.name || '?')[0].toUpperCase()}</div>`;
+  
+  const blurClass = blurActive ? ' blurred' : '';
+  const clickAttr = blurActive ? ' onclick="focusUnlock()"' : '';
+  const tickStr = m.is_me ? `<span class="msg-status-tick ${m.status}">${m.status === 'sent' ? '✓' : '✓✓'}</span>` : '';
+  
+  let fileStr = '';
+  if (m.file_url) {
+    if (m.file_type === 'image') {
+      fileStr = `<img class="chat-preview-image" src="${m.file_url}" alt="${esc(m.file_name)}" onclick="window.open('${m.file_url}', '_blank')">`;
+    } else if (m.file_type === 'video') {
+      fileStr = `<video class="chat-preview-video" controls src="${m.file_url}"></video>`;
+    } else {
+      const sizeStr = m.file_size ? (m.file_size > 1024 * 1024 ? (m.file_size / (1024 * 1024)).toFixed(1) + ' MB' : (m.file_size / 1024).toFixed(0) + ' KB') : '';
+      const docIcon = m.file_type === 'document' ? '📄' : '📎';
+      fileStr = `
+        <div class="chat-preview-doc">
+          <div class="chat-doc-icon">${docIcon}</div>
+          <div class="chat-doc-meta">
+            <div class="chat-doc-title">${esc(m.file_name)}</div>
+            <div class="chat-doc-size">${sizeStr}</div>
+          </div>
+          <a class="chat-doc-dl" href="${m.file_url}" download="${esc(m.file_name)}" target="_blank">Download</a>
+        </div>
+      `;
+    }
+  }
+
+  let replyQuoteStr = '';
+  if (m.reply_to) {
+    replyQuoteStr = `
+      <div class="reply-quote" onclick="scrollToMsg(${m.reply_to}); event.stopPropagation();">
+        <div class="reply-quote-sender">${esc(m.reply_to_sender || 'Friend')}</div>
+        <div>${esc(m.reply_to_text || 'Attachment')}</div>
+      </div>
+    `;
+  }
+
+  const editBtn = (m.is_me && !m.is_deleted) ? `<button class="msg-edit-btn" onclick="startEditMsg(${m.id})" title="Edit">✏️</button>` : '';
+  const delBtn = (m.is_me && !m.is_deleted) ? `<button class="msg-del-btn" onclick="deleteMsg(${m.id})" title="Delete">🗑️</button>` : '';
+  const editedTag = `<span class="msg-edited-tag" id="edited-${m.id}" style="${m.is_edited ? '' : 'display:none'}">(edited)</span>`;
+
+  el.innerHTML = `
+    ${avatarStr}
+    <div class="msg-content">
+      ${nameStr}
+      <div class="msg-bubble${blurClass}"${clickAttr} data-msg-id="${m.id}">
+        ${replyQuoteStr}
+        ${fileStr}
+        <div class="msg-text-content">${m.is_deleted ? `<i>${esc(m.text)}</i>` : (m.text ? `<div>${esc(m.text)}</div>` : '')}</div>
+      </div>
+      <div class="msg-time">${m.time}${editedTag}${tickStr}</div>
+    </div>
+    <div class="msg-actions">
+      <button class="msg-reply-btn" onclick="setReplyTo(${m.id})" title="Reply">↶</button>
+      ${editBtn}
+      ${delBtn}
+    </div>
+  `;
+  
   const ui=document.getElementById('uinline');
   if(ui) list.insertBefore(el,ui); else list.appendChild(el);
 }
@@ -1332,7 +2094,7 @@ function appendMsgEl(m){
 // ── BLUR TIMER ──
 function startBlurTimer(){
   clearInterval(blurTimer); blurLeft=60; blurActive=false;
-  document.querySelectorAll('#msgList .msg').forEach(m=>{ m.classList.remove('blurred'); m.removeAttribute('onclick'); });
+  document.querySelectorAll('#msgList .msg-bubble').forEach(m=>{ m.classList.remove('blurred'); m.removeAttribute('onclick'); });
   const ui=document.getElementById('uinline'); if(ui) ui.remove();
   updBlurPill();
   blurTimer=setInterval(()=>{ blurLeft--; updBlurPill(); if(blurLeft<=0){ clearInterval(blurTimer); activateBlur(); } },1000);
@@ -1342,7 +2104,7 @@ function updBlurPill(){
 }
 function activateBlur(){
   blurActive=true;
-  document.querySelectorAll('#msgList .msg').forEach(m=>{ m.classList.add('blurred'); m.setAttribute('onclick','focusUnlock()'); });
+  document.querySelectorAll('#msgList .msg-bubble').forEach(m=>{ m.classList.add('blurred'); m.setAttribute('onclick','focusUnlock()'); });
   appendUnlockUI(); $('blurPill').textContent='🔒';
 }
 function appendUnlockUI(){
@@ -1351,7 +2113,12 @@ function appendUnlockUI(){
   el.innerHTML=`<div class="uititle">🔒 Messages Blurred</div>
     <div class="uisub">Auto-locked every 60s.<br>Click any message or enter code.</div>
     <div class="uirow">
-      <input class="uiinp" id="ulIn" type="password" placeholder="••••" maxlength="8" onkeydown="if(event.key==='Enter')doUnlock()">
+      <div class="pw-wrap uiinp-wrap">
+        <input class="uiinp" id="ulIn" type="password" placeholder="••••" maxlength="8" onkeydown="if(event.key==='Enter')doUnlock()">
+        <button type="button" class="pw-toggle" onclick="togglePwVisibility('ulIn', this)" title="Toggle PIN visibility">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+        </button>
+      </div>
       <button class="uibtn" onclick="doUnlock()">Unlock</button>
     </div>
     <div class="uierr" id="ulErr"></div>`;
@@ -1364,7 +2131,7 @@ function doUnlock(){
   const code = BLUR_CODE || GATE_CODE;
   if(v===code){
     blurActive=false;
-    document.querySelectorAll('#msgList .msg.blurred').forEach(m=>{ m.classList.remove('blurred'); m.removeAttribute('onclick'); });
+    document.querySelectorAll('#msgList .msg-bubble.blurred').forEach(m=>{ m.classList.remove('blurred'); m.removeAttribute('onclick'); });
     const ui=document.getElementById('uinline'); if(ui) ui.remove();
     startBlurTimer();
   } else {
@@ -1373,15 +2140,345 @@ function doUnlock(){
   }
 }
 
+let editingMsgId = null;
+
 async function sendMsg(){
   const inp=$('chatIn'); const txt=(inp.value||'').trim(); if(!txt||!activeChat) return;
   inp.value='';
-  const d=await api('POST',`/api/messages/${activeChat}/`,{text:txt});
+  
+  if (editingMsgId) {
+    const d = await api('PATCH', `/api/messages/detail/${editingMsgId}/`, { text: txt });
+    if (d.ok) {
+      const el = document.getElementById('msg-' + editingMsgId);
+      if (el) {
+        const textEl = el.querySelector('.msg-text-content');
+        if (textEl) {
+          textEl.textContent = d.message.text;
+          textEl.dataset.original = d.message.text;
+        }
+        const tag = el.querySelector('.msg-edited-tag');
+        if (tag) tag.style.display = '';
+      }
+    }
+    editingMsgId = null;
+    inp.placeholder = 'Add a note...';
+    inp.style.border = '';
+    return;
+  }
+
+  const payload = { text: txt };
+  if (replyingToMsgId) {
+    payload.reply_to = replyingToMsgId;
+  }
+  
+  const d=await api('POST',`/api/messages/${activeChat}/`,payload);
   if(!d.ok) return;
   if(d.message.ts > lastMsgTs) lastMsgTs = d.message.ts;
   appendMsgEl(d.message);
   $('msgList').scrollTop=$('msgList').scrollHeight;
   renderFriends();
+  cancelReply();
+}
+
+function startEditMsg(msgId) {
+  const el = document.getElementById('msg-' + msgId);
+  if (!el) return;
+  const textEl = el.querySelector('.msg-text-content');
+  const text = textEl ? (textEl.dataset.original || textEl.textContent) : '';
+  editingMsgId = msgId;
+  $('chatIn').value = text;
+  $('chatIn').placeholder = 'Edit note...';
+  $('chatIn').style.border = '2px solid var(--sky)';
+  $('chatIn').focus();
+}
+
+async function deleteMsg(msgId) {
+  if (!confirm('Delete this message?')) return;
+  const d = await api('DELETE', `/api/messages/detail/${msgId}/`);
+  if (d.ok) {
+    const el = document.getElementById('msg-' + msgId);
+    if (el) {
+      const textEl = el.querySelector('.msg-text-content');
+      if (textEl) textEl.innerHTML = '<i>[This message was deleted]</i>';
+      const editB = el.querySelector('.msg-edit-btn');
+      const delB = el.querySelector('.msg-del-btn');
+      if (editB) editB.remove();
+      if (delB) delB.remove();
+    }
+  }
+}
+
+let lastTypingSentTime = 0;
+async function reportTyping() {
+  if (!activeChat) return;
+  const now = Date.now();
+  if (now - lastTypingSentTime > 3000) {
+    lastTypingSentTime = now;
+    await api('POST', `/api/messages/${activeChat}/typing/`);
+  }
+}
+
+const EMOJIS = ['😀','😂','😍','👍','🙏','🔥','🎉','👏','🌟','💡','📚','💻','✅','❌','⚠️','❤️','🤔','🎉'];
+function toggleEmojiPicker() {
+  const picker = $('emojiPicker');
+  if (!picker) return;
+  if (picker.style.display === 'grid') {
+    picker.style.display = 'none';
+  } else {
+    if (!picker.children.length) {
+      picker.innerHTML = EMOJIS.map(e => `<span class="emoji-item" onclick="insertEmoji('${e}')">${e}</span>`).join('');
+    }
+    picker.style.display = 'grid';
+  }
+}
+
+function insertEmoji(emoji) {
+  const inp = $('chatIn');
+  if (inp) {
+    inp.value += emoji;
+    inp.focus();
+  }
+  $('emojiPicker').style.display = 'none';
+}
+
+function toggleChatSearch(show) {
+  const bar = $('chatSearchBar');
+  const inp = $('chatSearchIn');
+  if (!bar) return;
+  
+  if (show === undefined) {
+    show = bar.style.display !== 'flex';
+  }
+  
+  if (show) {
+    bar.style.display = 'flex';
+    if (inp) {
+      inp.value = '';
+      inp.focus();
+    }
+  } else {
+    bar.style.display = 'none';
+    if (inp) inp.value = '';
+    filterMessages('');
+  }
+}
+
+function filterMessages(query) {
+  const q = (query || '').trim().toLowerCase();
+  const bubbles = document.querySelectorAll('#msgList .msg-bubble');
+  bubbles.forEach(b => {
+    const textEl = b.querySelector('.msg-text-content');
+    if (!textEl) return;
+    const originalText = textEl.dataset.original || textEl.textContent;
+    if (!textEl.dataset.original) {
+      textEl.dataset.original = originalText;
+    }
+    if (!q) {
+      textEl.innerHTML = esc(originalText);
+      b.closest('.msg-row').style.display = '';
+      return;
+    }
+    if (originalText.toLowerCase().includes(q)) {
+      const regex = new RegExp('(' + q.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + ')', 'gi');
+      textEl.innerHTML = esc(originalText).replace(regex, '<span class="search-highlight">$1</span>');
+      b.closest('.msg-row').style.display = '';
+    } else {
+      b.closest('.msg-row').style.display = 'none';
+    }
+  });
+}
+
+let isLoadingHistory = false;
+function initInfiniteScroll() {
+  const list = $('msgList');
+  if (!list) return;
+  list.addEventListener('scroll', async () => {
+    if (list.scrollTop === 0 && !isLoadingHistory) {
+      const firstMsgEl = list.querySelector('.msg-row');
+      if (!firstMsgEl) return;
+      const firstMsgId = firstMsgEl.id.replace('msg-', '');
+      if (!firstMsgId) return;
+      
+      isLoadingHistory = true;
+      const oldScrollHeight = list.scrollHeight;
+      
+      const d = await api('GET', `/api/messages/${activeChat}/?before_id=${firstMsgId}`);
+      if (d.ok && d.messages && d.messages.length > 0) {
+        d.messages.reverse().forEach(m => {
+          if(document.getElementById('msg-'+m.id)) return;
+          const el = document.createElement('div');
+          el.className = 'msg-row ' + (m.is_me ? 'me' : 'them');
+          el.id = 'msg-' + m.id;
+          
+          const nameStr = m.is_me ? '' : `<div class="msg-sender">${esc(activeChatData?.name || 'Friend')}</div>`;
+          const avatarStr = m.is_me ? '' : `<div class="msg-avatar" style="background:${activeChatData?.color || 'var(--muted)'}">${(activeChatData?.name || '?')[0].toUpperCase()}</div>`;
+          const blurClass = blurActive ? ' blurred' : '';
+          const clickAttr = blurActive ? ' onclick="focusUnlock()"' : '';
+          const tickStr = m.is_me ? `<span class="msg-status-tick ${m.status}">${m.status === 'sent' ? '✓' : '✓✓'}</span>` : '';
+          
+          let fileStr = '';
+          if (m.file_url) {
+            if (m.file_type === 'image') {
+              fileStr = `<img class="chat-preview-image" src="${m.file_url}" alt="${esc(m.file_name)}" onclick="window.open('${m.file_url}', '_blank')">`;
+            } else if (m.file_type === 'video') {
+              fileStr = `<video class="chat-preview-video" controls src="${m.file_url}"></video>`;
+            } else {
+              const sizeStr = m.file_size ? (m.file_size > 1024 * 1024 ? (m.file_size / (1024 * 1024)).toFixed(1) + ' MB' : (m.file_size / 1024).toFixed(0) + ' KB') : '';
+              const docIcon = m.file_type === 'document' ? '📄' : '📎';
+              fileStr = `
+                <div class="chat-preview-doc">
+                  <div class="chat-doc-icon">${docIcon}</div>
+                  <div class="chat-doc-meta">
+                    <div class="chat-doc-title">${esc(m.file_name)}</div>
+                    <div class="chat-doc-size">${sizeStr}</div>
+                  </div>
+                  <a class="chat-doc-dl" href="${m.file_url}" download="${esc(m.file_name)}" target="_blank">Download</a>
+                </div>
+              `;
+            }
+          }
+          
+          let replyQuoteStr = '';
+          if (m.reply_to) {
+            replyQuoteStr = `
+              <div class="reply-quote" onclick="scrollToMsg(${m.reply_to}); event.stopPropagation();">
+                <div class="reply-quote-sender">${esc(m.reply_to_sender || 'Friend')}</div>
+                <div>${esc(m.reply_to_text || 'Attachment')}</div>
+              </div>
+            `;
+          }
+          
+          const editBtn = (m.is_me && !m.is_deleted) ? `<button class="msg-edit-btn" onclick="startEditMsg(${m.id})" title="Edit">✏️</button>` : '';
+          const delBtn = (m.is_me && !m.is_deleted) ? `<button class="msg-del-btn" onclick="deleteMsg(${m.id})" title="Delete">🗑️</button>` : '';
+          const editedTag = `<span class="msg-edited-tag" id="edited-${m.id}" style="${m.is_edited ? '' : 'display:none'}">(edited)</span>`;
+          
+          el.innerHTML = `
+            ${avatarStr}
+            <div class="msg-content">
+              ${nameStr}
+              <div class="msg-bubble${blurClass}"${clickAttr} data-msg-id="${m.id}">
+                ${replyQuoteStr}
+                ${fileStr}
+                <div class="msg-text-content">${m.is_deleted ? `<i>${esc(m.text)}</i>` : (m.text ? `<div>${esc(m.text)}</div>` : '')}</div>
+              </div>
+              <div class="msg-time">${m.time}${editedTag}${tickStr}</div>
+            </div>
+            <div class="msg-actions">
+              <button class="msg-reply-btn" onclick="setReplyTo(${m.id})" title="Reply">↶</button>
+              ${editBtn}
+              ${delBtn}
+            </div>
+          `;
+          
+          list.insertBefore(el, list.firstChild);
+        });
+        
+        list.scrollTop = list.scrollHeight - oldScrollHeight;
+      }
+      isLoadingHistory = false;
+    }
+  });
+}
+
+function setReplyTo(msgId) {
+  const el = document.getElementById('msg-' + msgId);
+  if (!el) return;
+  
+  replyingToMsgId = msgId;
+  
+  const bubble = el.querySelector('.msg-bubble');
+  const senderEl = el.querySelector('.msg-sender');
+  
+  let senderName = 'Friend';
+  if (el.classList.contains('me')) {
+    senderName = 'You';
+  } else if (senderEl) {
+    senderName = senderEl.textContent;
+  } else if (activeChatData) {
+    senderName = activeChatData.name;
+  }
+  
+  let textContent = '';
+  const fileImg = bubble.querySelector('.chat-preview-image');
+  const fileVid = bubble.querySelector('.chat-preview-video');
+  const fileDoc = bubble.querySelector('.chat-preview-doc');
+  
+  if (fileImg) textContent = '[Image]';
+  else if (fileVid) textContent = '[Video]';
+  else if (fileDoc) {
+    const docTitle = fileDoc.querySelector('.chat-doc-title');
+    textContent = docTitle ? `[File] ${docTitle.textContent}` : '[File]';
+  } else {
+    const clone = bubble.cloneNode(true);
+    const quote = clone.querySelector('.reply-quote');
+    if (quote) quote.remove();
+    textContent = (clone.textContent || '').trim();
+  }
+  
+  $('replyPreviewSender').textContent = 'Replying to ' + senderName;
+  $('replyPreviewText').textContent = textContent;
+  $('replyPreviewRow').style.display = 'flex';
+  $('chatIn').focus();
+}
+
+function cancelReply() {
+  replyingToMsgId = null;
+  $('replyPreviewRow').style.display = 'none';
+}
+
+function scrollToMsg(id) {
+  const el = document.getElementById('msg-' + id);
+  if (el) {
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el.classList.add('highlight-flash');
+    setTimeout(() => el.classList.remove('highlight-flash'), 1500);
+  }
+}
+
+let touchStartX = 0;
+let touchStartY = 0;
+let activeSwipeBubble = null;
+let activeSwipeMsgId = null;
+
+function initSwipeToReply() {
+  const list = $('msgList');
+  if (!list) return;
+  
+  list.addEventListener('touchstart', (e) => {
+    const bubble = e.target.closest('.msg-bubble');
+    if (!bubble) return;
+    activeSwipeBubble = bubble;
+    activeSwipeMsgId = bubble.dataset.msgId;
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+  }, { passive: true });
+
+  list.addEventListener('touchmove', (e) => {
+    if (!activeSwipeBubble) return;
+    const currentX = e.touches[0].clientX;
+    const currentY = e.touches[0].clientY;
+    const deltaX = currentX - touchStartX;
+    const deltaY = currentY - touchStartY;
+
+    if (Math.abs(deltaX) > Math.abs(deltaY) && deltaX > 0) {
+      const translateX = Math.min(deltaX, 60);
+      activeSwipeBubble.style.transform = `translateX(${translateX}px)`;
+    }
+  }, { passive: true });
+
+  list.addEventListener('touchend', (e) => {
+    if (!activeSwipeBubble) return;
+    const currentX = e.changedTouches[0].clientX;
+    const deltaX = currentX - touchStartX;
+
+    if (deltaX > 45 && activeSwipeMsgId) {
+      setReplyTo(activeSwipeMsgId);
+    }
+    
+    activeSwipeBubble.style.transform = '';
+    activeSwipeBubble = null;
+    activeSwipeMsgId = null;
+  });
 }
 
 // ══════════════════════════════════════════
@@ -1409,6 +2506,112 @@ function applyTheme(theme){
 function toggleDark(){
   const cur = document.documentElement.getAttribute('data-theme') || 'light';
   applyTheme(cur === 'dark' ? 'light' : 'dark');
+}
+
+function togglePwVisibility(inputId, btnEl){
+  const inp = document.getElementById(inputId);
+  if(!inp) return;
+  const isPrivate = inp.type === 'password';
+  inp.type = isPrivate ? 'text' : 'password';
+  
+  const eyeSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>`;
+  const eyeOffSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>`;
+  
+  btnEl.innerHTML = isPrivate ? eyeOffSvg : eyeSvg;
+}
+
+async function uploadFile(file){
+  if(!file || !activeChat) return;
+  
+  if(file.size > 10 * 1024 * 1024){
+    showBanner('✕ File size exceeds the 10MB limit.');
+    return;
+  }
+  
+  const ext = file.name.split('.').pop().toLowerCase();
+  const allowed = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'mp4', 'mov', 'webm', 'pdf', 'docx', 'xlsx', 'pptx', 'ppt', 'txt'];
+  if(!allowed.includes(ext)){
+    showBanner(`✕ File type .${ext} is not supported.`);
+    return;
+  }
+  
+  const fd = new FormData();
+  fd.append('file', file);
+  if (replyingToMsgId) {
+    fd.append('reply_to', replyingToMsgId);
+  }
+  
+  const pCont = $('uploadProgressContainer');
+  const pBar = $('uploadProgressBar');
+  pCont.style.display = 'block';
+  pBar.style.width = '0%';
+  
+  const xhr = new XMLHttpRequest();
+  xhr.open('POST', `/api/messages/${activeChat}/`, true);
+  xhr.setRequestHeader('X-CSRFToken', getCSRF());
+  
+  xhr.upload.onprogress = function(e){
+    if(e.lengthComputable){
+      const pct = Math.round((e.loaded / e.total) * 100);
+      pBar.style.width = pct + '%';
+    }
+  };
+  
+  xhr.onload = function(){
+    pCont.style.display = 'none';
+    $('fileIn').value = '';
+    if(xhr.status >= 200 && xhr.status < 300){
+      const res = JSON.parse(xhr.responseText);
+      if(res.ok){
+        if(res.message.ts > lastMsgTs) lastMsgTs = res.message.ts;
+        appendMsgEl(res.message);
+        $('msgList').scrollTop = $('msgList').scrollHeight;
+        renderFriends();
+        cancelReply();
+      } else {
+        showBanner('✕ ' + (res.error || 'Upload failed.'));
+      }
+    } else {
+      showBanner('✕ Upload failed. Server returned ' + xhr.status);
+    }
+  };
+  
+  xhr.onerror = function(){
+    pCont.style.display = 'none';
+    $('fileIn').value = '';
+    showBanner('✕ Network error during upload.');
+  };
+  
+  xhr.send(fd);
+}
+
+function initDragDrop(){
+  const list = $('msgList');
+  if(!list) return;
+  
+  ['dragenter', 'dragover'].forEach(name => {
+    list.addEventListener(name, (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      list.classList.add('dragover');
+    }, false);
+  });
+  
+  ['dragleave', 'drop'].forEach(name => {
+    list.addEventListener(name, (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      list.classList.remove('dragover');
+    }, false);
+  });
+  
+  list.addEventListener('drop', (e) => {
+    const dt = e.dataTransfer;
+    const files = dt.files;
+    if(files && files.length){
+      uploadFile(files[0]);
+    }
+  }, false);
 }
 </script>
 </body>

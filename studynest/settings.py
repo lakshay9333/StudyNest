@@ -79,3 +79,12 @@ SESSION_COOKIE_AGE = 60 * 60 * 24 * 30  # 30 days — stay logged in
 SESSION_SAVE_EVERY_REQUEST = True
 
 LOGIN_URL = '/'
+
+# ── AI Search ─────────────────────────────────────────────
+# Paste your Anthropic API key here.
+# Get one free at: https://console.anthropic.com
+# On Windows PowerShell you cannot use `export` — set it here instead.
+ANTHROPIC_API_KEY = 'your_api_key_here'   # ← replace this with your real key
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
