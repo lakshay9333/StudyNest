@@ -904,7 +904,8 @@ body::before{content:'';position:fixed;inset:0;opacity:.025;background-image:url
     </div>
     <div id="regForm" style="display:none">
       <div class="idhint">🪪 A unique Student ID is auto-generated — share it with friends to connect!</div>
-      <input class="lf" id="rName" placeholder="Full Name" onkeydown="if(event.key==='Enter')focusNext(this,'rUser')">
+      <input class="lf" id="rName" placeholder="Full Name" onkeydown="if(event.key==='Enter')focusNext(this,'rEmail')">
+      <input class="lf" id="rEmail" type="email" placeholder="Email Address" onkeydown="if(event.key==='Enter')focusNext(this,'rUser')">
       <input class="lf" id="rUser" placeholder="Username (unique)" onkeydown="if(event.key==='Enter')focusNext(this,'rPass')" oninput="checkUsernameAvail(this.value)">
       <div class="pw-wrap lf-wrap">
         <input class="lf" id="rPass" type="password" placeholder="Password (min 4 chars)" onkeydown="if(event.key==='Enter')doRegister()">
@@ -1332,13 +1333,15 @@ async function doLogin(){
 
 async function doRegister(){
   const name     = ($('rName').value || '').trim();
+  const email    = ($('rEmail').value || '').trim();
   const username = ($('rUser').value || '').trim();
   const password = $('rPass').value || '';
   if(!name)    { $('rErr').textContent='✕ Enter your full name.'; return; }
+  if(!email)   { $('rErr').textContent='✕ Enter your email address.'; return; }
   if(!username){ $('rErr').textContent='✕ Choose a username.'; return; }
   if(!password){ $('rErr').textContent='✕ Choose a password.'; return; }
   $('rErr').textContent='Creating account…';
-  const d = await api('POST','/api/auth/register/',{ name, username, password });
+  const d = await api('POST','/api/auth/register/',{ name, email, username, password });
   if(!d.ok){ $('rErr').textContent='✕ '+(d.error||'Registration failed. Try again.'); return; }
   $('rErr').textContent='';
   ME = d.user;

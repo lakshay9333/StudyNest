@@ -44,14 +44,17 @@ def api_register(request):
     d = json_body(request)
     name     = (d.get('name') or '').strip()
     username = (d.get('username') or '').strip().lower()
+    email    = (d.get('email') or '').strip().lower()
     password = (d.get('password') or '').strip()
 
-    if not name or not username or not password:
+    if not name or not username or not password or not email:
         return err('All fields are required.')
     if len(password) < 4:
         return err('Password must be at least 4 characters.')
     if User.objects.filter(username=username).exists():
         return err('Username already taken.')
+    if User.objects.filter(email=email).exists():
+        return err('This email is already registered. Please log in or use a different email.')
 
     # pick colour based on user count
     count = User.objects.count()
@@ -60,6 +63,7 @@ def api_register(request):
     parts = name.split(' ', 1)
     user = User(
         username   = username,
+        email      = email,
         first_name = parts[0],
         last_name  = parts[1] if len(parts) > 1 else '',
         color      = color,

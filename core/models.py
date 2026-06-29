@@ -7,6 +7,7 @@ from django.contrib.auth.models import AbstractUser
 class User(AbstractUser):
     """Extended user — stores student ID, display colour."""
     student_id = models.CharField(max_length=12, unique=True, blank=True)
+    email      = models.EmailField(unique=True, null=True, blank=False, max_length=254)
     color      = models.CharField(max_length=10, default='#4a6741')
     created_at = models.DateTimeField(auto_now_add=True)
     last_seen  = models.DateTimeField(null=True, blank=True)
